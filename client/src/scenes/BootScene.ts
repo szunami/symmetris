@@ -6,6 +6,9 @@ import { RoomConnection } from "../connection";
 const connectionDetails = import.meta.env.DEV
   ? { host: "localhost", port: 4000, transportType: "tcp" as const }
   : undefined;
+// const connectionDetails = import.meta.env.DEV
+//   ? { host: "1.proxy.hathora.dev", port: 33433, transportType: "tcp" as const }
+//   : undefined;
 const client = new HathoraClient(process.env.APP_ID!, connectionDetails);
 
 // Here we extend from Phaser's Scene class to create a game scene compatible with Phaser
