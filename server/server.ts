@@ -30,7 +30,10 @@ const store: Application = {
       console.log("newRoom", roomId, userId);
       // todo: interesting initial config
       rooms.set(roomId, {
-        bricks: [{ point: { x: 0, y: 10 }, id: uuidv4() }],
+        bricks: [
+          { point: { x: 0, y: 10 }, id: uuidv4() },
+          { point: { x: 5, y: 10 }, id: uuidv4() }
+        ],
         player1: {
           id: userId
         },
@@ -43,13 +46,11 @@ const store: Application = {
       if (game.player1?.id !== userId) {
         game.player2 = { id: userId };
 
-        game.player1Falling = {
-          bricks: [{ point: { x: 0, y: 0 }, id: uuidv4() }]
-        };
+        game.player1Falling = player1RandomPiece();
 
-        game.player2Falling = {
-          bricks: [{ point: { x: 0, y: 20 }, id: uuidv4() }]
-        };
+        // game.player2Falling = {
+        //   bricks: [{ point: { x: 0, y: 20 }, id: uuidv4() }]
+        // };
       }
     }
   },
@@ -106,6 +107,9 @@ const store: Application = {
             game.player1Falling?.bricks.forEach(brick => {
               brick.point.x = brick.point.x + 1;
             });
+            if (game.player1Falling?.pivot) {
+              game.player1Falling.pivot.x++;
+            }
           }
         }
 
@@ -123,6 +127,35 @@ const store: Application = {
           if (!leftBlocked) {
             game.player1Falling?.bricks.forEach(brick => {
               brick.point.x = brick.point.x - 1;
+            });
+            if (game.player1Falling?.pivot) {
+              game.player1Falling.pivot.x = game.player1Falling.pivot.x - 1;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.Rotate) {
+          var rotateBlocked = false;
+
+          game.player1Falling?.bricks.forEach(brick => {
+            var pivot = game.player1Falling?.pivot!;
+            var offsetX = brick.point.x - pivot.x;
+            var offsetY = brick.point.y - pivot.y;
+            var newX = pivot.x - offsetY;
+            var newY = pivot.y + offsetX;
+            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            ) {
+              rotateBlocked = true;
+            }
+          });
+
+          if (!rotateBlocked) {
+            game.player1Falling?.bricks.forEach(brick => {
+              var pivot = game.player1Falling?.pivot!;
+              var offsetX = brick.point.x - pivot.x;
+              var offsetY = brick.point.y - pivot.y;
+              brick.point.x = pivot.x - offsetY;
+              brick.point.y = pivot.y + offsetX;
             });
           }
         }
@@ -181,17 +214,28 @@ function tick(game: GameState, deltaMs: number) {
       if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y + 1 }))) {
         player1Blocked = true;
       }
+      game.player2Falling?.bricks.forEach((enemyBrick) => {
+        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 2
+        ) {
+          player1Blocked = true;
+        }
+      })
     });
     if (!player1Blocked) {
       game.player1Falling?.bricks.forEach((brick) => {
         brick.point.y = brick.point.y + 1;
       })
+      if (game.player1Falling?.pivot.y) {
+        game.player1Falling.pivot.y = game.player1Falling?.pivot.y + 1;
+      }
     }
     if (player1Blocked) {
       game.player1Falling?.bricks.forEach((brick) => {
         game.bricks.push(brick);
       });
-      game.player1Falling = player1line();
+      game.player1Falling = player1RandomPiece();
     }
 
     game.player2Falling?.bricks.forEach((brick) => {
@@ -199,19 +243,79 @@ function tick(game: GameState, deltaMs: number) {
         brick.point.y = brick.point.y - 1;
       }
     });
+
+    // todo: check for clear
+    occupiedPoints.clear();
+    game.bricks.forEach(brick => {
+      occupiedPoints.add(key(brick.point));
+    })
+
+    for (let b = 10; b >= 0; b--) {
+      var rowClear = true;
+      for (let a = 0; a < 10; a++) {
+        if (!occupiedPoints.has(key({ x: a, y: b }))) {
+          rowClear = false;
+        }
+      }
+
+      if (rowClear) {
+        console.log(`${b} is clear`);
+
+        console.log(`bricks: ${game.bricks.length}`);
+        game.bricks = game.bricks.filter(brick => brick.point.y != b);
+        console.log(`bricks: ${game.bricks.length}`);
+
+        game.bricks.forEach(brick => {
+          console.log(`y: ${brick.point.y}`);
+          if (brick.point.y < b) {
+            brick.point.y += 1;
+            console.log(brick.point.y);
+            console.log(`new y: ${brick.point.y}`);
+          }
+        });
+        occupiedPoints.clear();
+        game.bricks.forEach(brick => {
+          occupiedPoints.add(key(brick.point));
+        })
+      }
+    }
+
+    // todo: check for game over
   }
+}
+
+function player1RandomPiece(): Tetronimo {
+  if (Math.floor(Math.random() * 2) == 0) {
+    return player1line();
+  }
+  return player1j();
 }
 
 function player1line(): Tetronimo {
   return {
     bricks: [
-      { point: { x: 0, y: 0 }, id: uuidv4() },
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
       { point: { x: 1, y: 0 }, id: uuidv4() },
       { point: { x: 2, y: 0 }, id: uuidv4() },
       { point: { x: 3, y: 0 }, id: uuidv4() }
-    ]
+    ],
+    pivot: { x: 1.5, y: 0.5 }
   };
 }
+
+function player1j(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 0, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+
 
 function broadcastStateUpdate(roomId: RoomId) {
   const game = rooms.get(roomId)!;
