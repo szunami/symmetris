@@ -6,7 +6,6 @@ import { UserId, RoomId, Application, startServer, verifyJwt } from "@hathora/se
 import dotenv from "dotenv";
 import { GameState, Point, Tetronimo } from "../common/types";
 import { ClientMessage, ClientMessageType, ServerMessage, ServerMessageType } from "../common/messages";
-import { V4MAPPED } from "dns";
 
 // The millisecond tick rate
 const TICK_INTERVAL_MS = 500;
@@ -415,9 +414,8 @@ function tick(game: GameState, deltaMs: number) {
       }
     }
 
+    // todo: check for player 1 falling in player 2 zone
 
-
-    // todo: check for game over
     var player1lost = false;
 
     for (let a = 0; a < 10; a++) {
@@ -426,6 +424,12 @@ function tick(game: GameState, deltaMs: number) {
       }
     }
 
+    game.player2Falling?.bricks.forEach(brick => {
+      if (brick.point.y == 0) {
+        player1lost = true;
+      }
+    })
+
     var player2lost = false;
 
     for (let a = 0; a < 10; a++) {
@@ -433,6 +437,12 @@ function tick(game: GameState, deltaMs: number) {
         player2lost = true;
       }
     }
+
+    game.player1Falling?.bricks.forEach(brick => {
+      if (brick.point.y == 19) {
+        player2lost = true;
+      }
+    })
 
     if (player1lost && player2lost) {
       game.winner = "tie"
@@ -443,7 +453,6 @@ function tick(game: GameState, deltaMs: number) {
     else if (player2lost) {
       game.winner = game.player1;
     }
-
   }
 }
 
