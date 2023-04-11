@@ -1,76 +1,18 @@
 import path from "path";
 import { fileURLToPath } from "url";
+import { v4 as uuidv4 } from "uuid";
 
 import { UserId, RoomId, Application, startServer, verifyJwt } from "@hathora/server-sdk";
 import dotenv from "dotenv";
-import { Box, Body, System } from "detect-collisions";
-import { Direction, GameState } from "../common/types";
+import { GameState, Point, Tetronimo } from "../common/types";
 import { ClientMessage, ClientMessageType, ServerMessage, ServerMessageType } from "../common/messages";
-import map from "../common/map.json" assert { type: "json" };
+import { V4MAPPED } from "dns";
 
 // The millisecond tick rate
-const TICK_INTERVAL_MS = 50;
-
-// Player configuration
-const PLAYER_RADIUS = 20; // The player's circular radius, used for collision detection
-const PLAYER_SPEED = 200; // The player's movement speed
-
-// Bullet configuration
-const BULLET_RADIUS = 9; // The bullet's circular radius, used for collision detection
-const BULLET_SPEED = 800; // The bullet's movement speed when shot
-
-// An x, y vector representing the spawn location of the player on the map
-const SPAWN_POSITIONS = [
-  {
-    x: 512,
-    y: 512,
-  },
-  {
-    x: 512,
-    y: 2048,
-  },
-];
-
-// The width of the map boundary rectangles
-const BOUNDARY_WIDTH = 50;
-
-// An enum which represents the type of body for a given object
-enum BodyType {
-  Player,
-  Bullet,
-  Wall,
-}
-
-// A type to represent a physics body with a type (uses BodyType above)
-type PhysicsBody = Body & { oType: BodyType };
-
-// A type which defines the properties of a player used internally on the server (not sent to client)
-type InternalPlayer = {
-  id: UserId;
-  body: PhysicsBody;
-  direction: Direction;
-  angle: number;
-};
-
-// A type which defines the properties of a bullet used internally on the server (not sent to client)
-type InternalBullet = {
-  id: number;
-  body: PhysicsBody;
-  angle: number;
-};
-
-// A type which represents the internal state of the server, containing:
-//   - physics: our "physics" engine (detect-collisions library)
-//   - players: an array containing all connected players to a room
-//   - bullets: an array containing all bullets currently in the air for a given room
-type InternalState = {
-  physics: System;
-  players: InternalPlayer[];
-  bullets: InternalBullet[];
-};
+const TICK_INTERVAL_MS = 500;
 
 // A map which the server uses to contain all room's InternalState instances
-const rooms: Map<RoomId, InternalState> = new Map();
+const rooms: Map<RoomId, GameState> = new Map();
 
 // Create an object to represent our Store
 const store: Application = {
@@ -86,22 +28,27 @@ const store: Application = {
   subscribeUser(roomId: RoomId, userId: string): void {
     if (!rooms.has(roomId)) {
       console.log("newRoom", roomId, userId);
-      rooms.set(roomId, initializeRoom());
+      // todo: interesting initial config
+      rooms.set(roomId, {
+        bricks: [
+          { point: { x: 0, y: 10 }, id: uuidv4() },
+          { point: { x: 5, y: 10 }, id: uuidv4() }
+        ],
+        player1: {
+          id: userId
+        },
+      });
     }
     console.log("subscribeUser", roomId, userId);
     const game = rooms.get(roomId)!;
 
-    // Make sure the player hasn't already spawned
-    if (!game.players.some((player) => player.id === userId)) {
-      // Then create a physics body for the player
-      const spawn = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
-      const body = game.physics.createCircle(spawn, PLAYER_RADIUS);
-      game.players.push({
-        id: userId,
-        body: Object.assign(body, { oType: BodyType.Player }),
-        direction: Direction.None,
-        angle: 0,
-      });
+    if (game.player2 === undefined) {
+      if (game.player1?.id !== userId) {
+        game.player2 = { id: userId };
+
+        game.player1Falling = player1RandomPiece();
+        game.player2Falling = player2RandomPiece();
+      }
     }
   },
 
@@ -112,14 +59,6 @@ const store: Application = {
       return;
     }
     console.log("unsubscribeUser", roomId, userId);
-
-    // Remove the player from the room's state
-    const game = rooms.get(roomId)!;
-    const idx = game.players.findIndex((player) => player.id === userId);
-    if (idx >= 0) {
-      game.physics.remove(game.players[idx].body);
-      game.players.splice(idx, 1);
-    }
   },
 
   // onMessage is an integral part of your game's server. It is responsible for reading messages sent from the clients and handling them accordingly, this is where your game's event-based logic should live
@@ -130,32 +69,180 @@ const store: Application = {
 
     // Get the player, or return out of the function if they don't exist
     const game = rooms.get(roomId)!;
-    const player = game.players.find((player) => player.id === userId);
-    if (player === undefined) {
-      return;
-    }
 
     // Parse out the data string being sent from the client
     const message: ClientMessage = JSON.parse(Buffer.from(data).toString("utf8"));
 
-    // Handle the various message types, specific to this game
-    if (message.type === ClientMessageType.SetDirection) {
-      player.direction = message.direction;
-    } else if (message.type === ClientMessageType.SetAngle) {
-      player.angle = message.angle;
-    } else if (message.type === ClientMessageType.Shoot) {
-      const body = game.physics.createCircle({ x: player.body.x, y: player.body.y }, BULLET_RADIUS);
-      game.bullets.push({
-        id: Math.floor(Math.random() * 1e6),
-        body: Object.assign(body, { oType: BodyType.Bullet }),
-        angle: player.angle,
-      });
-    } else if (message.type === ClientMessageType.Ping) {
+    if (message.type === ClientMessageType.Ping) {
       const msg: ServerMessage = {
         type: ServerMessageType.PingResponse,
         id: message.id,
       };
       server.sendMessage(roomId, userId, Buffer.from(JSON.stringify(msg), "utf8"));
+    } else {
+
+      const occupiedPoints = new Set<string>();
+      game.bricks.forEach(brick => {
+        occupiedPoints.add(key(brick.point));
+      });
+
+      if (userId === game.player1?.id) {
+        if (message.type === ClientMessageType.MoveRight) {
+          // todo: check if blocked
+          var rightBlocked = false;
+
+          game.player1Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x + 1, y: brick.point.y }))
+              || brick.point.x + 1 == 10
+            ) {
+              rightBlocked = true;
+            }
+          });
+
+          if (!rightBlocked) {
+            game.player1Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x + 1;
+            });
+            if (game.player1Falling?.pivot) {
+              game.player1Falling.pivot.x++;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.MoveLeft) {
+          // todo: check if blocked
+          var leftBlocked = false;
+
+          game.player1Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x - 1, y: brick.point.y }))
+              || brick.point.x - 1 == -1) {
+              leftBlocked = true;
+            }
+          });
+
+          if (!leftBlocked) {
+            game.player1Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x - 1;
+            });
+            if (game.player1Falling?.pivot) {
+              game.player1Falling.pivot.x = game.player1Falling.pivot.x - 1;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.Rotate) {
+          var rotateBlocked = false;
+
+          game.player1Falling?.bricks.forEach(brick => {
+            var pivot = game.player1Falling?.pivot!;
+            var offsetX = brick.point.x - pivot.x;
+            var offsetY = brick.point.y - pivot.y;
+            var newX = pivot.x - offsetY;
+            var newY = pivot.y + offsetX;
+            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            ) {
+              rotateBlocked = true;
+            }
+          });
+
+          if (!rotateBlocked) {
+            game.player1Falling?.bricks.forEach(brick => {
+              var pivot = game.player1Falling?.pivot!;
+              var offsetX = brick.point.x - pivot.x;
+              var offsetY = brick.point.y - pivot.y;
+              brick.point.x = pivot.x - offsetY;
+              brick.point.y = pivot.y + offsetX;
+            });
+          }
+        }
+
+        // todo: remove player2s update here!
+        const msg: ServerMessage = {
+          type: ServerMessageType.StateUpdate,
+          state: game,
+          ts: Date.now(),
+        }
+        server.sendMessage(roomId, userId, Buffer.from(JSON.stringify(msg), "utf8"));
+      }
+
+      if (userId === game.player2?.id) {
+        if (message.type === ClientMessageType.MoveRight) {
+          // todo: check if blocked
+          var rightBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x + 1, y: brick.point.y }))
+              || brick.point.x + 1 == 10
+            ) {
+              rightBlocked = true;
+            }
+          });
+
+          if (!rightBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x + 1;
+            });
+            if (game.player2Falling?.pivot) {
+              game.player2Falling.pivot.x++;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.MoveLeft) {
+          // todo: check if blocked
+          var leftBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x - 1, y: brick.point.y }))
+              || brick.point.x - 1 == -1) {
+              leftBlocked = true;
+            }
+          });
+
+          if (!leftBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x - 1;
+            });
+            if (game.player2Falling?.pivot) {
+              game.player2Falling.pivot.x = game.player2Falling.pivot.x - 1;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.Rotate) {
+          var rotateBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            var pivot = game.player2Falling?.pivot!;
+            var offsetX = brick.point.x - pivot.x;
+            var offsetY = brick.point.y - pivot.y;
+            var newX = pivot.x - offsetY;
+            var newY = pivot.y + offsetX;
+            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            ) {
+              rotateBlocked = true;
+            }
+          });
+
+          if (!rotateBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              var pivot = game.player2Falling?.pivot!;
+              var offsetX = brick.point.x - pivot.x;
+              var offsetY = brick.point.y - pivot.y;
+              brick.point.x = pivot.x - offsetY;
+              brick.point.y = pivot.y + offsetX;
+            });
+          }
+        }
+
+        // todo: remove player2s update here!
+        const msg: ServerMessage = {
+          type: ServerMessageType.StateUpdate,
+          state: game,
+          ts: Date.now(),
+        }
+        server.sendMessage(roomId, userId, Buffer.from(JSON.stringify(msg), "utf8"));
+      }
     }
   },
 };
@@ -175,116 +262,414 @@ console.log(`Server listening on port ${port}`);
 setInterval(() => {
   rooms.forEach((game, roomId) => {
     // Tick each room's game
-    tick(game, TICK_INTERVAL_MS / 1000);
+    tick(game, 0 - 6706 - 706 - 706 - 7 / 1000);
 
     // Send the state updates to each client connected to that room
     broadcastStateUpdate(roomId);
   });
 }, TICK_INTERVAL_MS);
 
-// The frame-by-frame logic of your game should live in it's server's tick function. This is often a place to check for collisions, compute score, and so forth
-function tick(game: InternalState, deltaMs: number) {
-  // Move each player with a direction set
-  game.players.forEach((player) => {
-    if (player.direction === Direction.Up) {
-      player.body.y -= PLAYER_SPEED * deltaMs;
-    } else if (player.direction === Direction.Down) {
-      player.body.y += PLAYER_SPEED * deltaMs;
-    } else if (player.direction === Direction.Left) {
-      player.body.x -= PLAYER_SPEED * deltaMs;
-    } else if (player.direction === Direction.Right) {
-      player.body.x += PLAYER_SPEED * deltaMs;
-    }
-  });
 
-  // Move all active bullets along a path based on their radian angle
-  game.bullets.forEach((bullet) => {
-    bullet.body.x += Math.cos(bullet.angle) * BULLET_SPEED * deltaMs;
-    bullet.body.y += Math.sin(bullet.angle) * BULLET_SPEED * deltaMs;
-  });
-
-  // Handle collision detections between the various types of PhysicsBody's
-  game.physics.checkAll(({ a, b, overlapV }: { a: PhysicsBody; b: PhysicsBody; overlapV: SAT.Vector }) => {
-    if (a.oType === BodyType.Player && b.oType === BodyType.Wall) {
-      a.x -= overlapV.x;
-      a.y -= overlapV.y;
-    } else if (a.oType === BodyType.Player && b.oType === BodyType.Player) {
-      b.x += overlapV.x;
-      b.y += overlapV.y;
-    } else if (a.oType === BodyType.Bullet && b.oType === BodyType.Wall) {
-      game.physics.remove(a);
-      const bulletIdx = game.bullets.findIndex((bullet) => bullet.body === a);
-      if (bulletIdx >= 0) {
-        game.bullets.splice(bulletIdx, 1);
-      }
-    } else if (a.oType === BodyType.Bullet && b.oType === BodyType.Player) {
-      game.physics.remove(a);
-      const bulletIdx = game.bullets.findIndex((bullet) => bullet.body === a);
-      if (bulletIdx >= 0) {
-        game.bullets.splice(bulletIdx, 1);
-      }
-      game.physics.remove(b);
-      const playerIdx = game.players.findIndex((player) => player.body === b);
-      if (playerIdx >= 0) {
-        game.players.splice(playerIdx, 1);
-      }
-    }
-  });
+function key(point: Point): string {
+  return `(${point.x}, ${point.y}`;
 }
+
+// The frame-by-frame logic of your game should live in it's server's tick function. This is often a place to check for collisions, compute score, and so forth
+function tick(game: GameState, deltaMs: number) {
+
+  if (game.winner) {
+    return;
+  }
+
+  const occupiedPoints = new Set<string>();
+  game.bricks.forEach(brick => {
+    occupiedPoints.add(key(brick.point));
+  })
+
+  if (game.player1 !== undefined && game.player2 !== undefined) {
+    var player1Blocked = false;
+    game.player1Falling?.bricks.forEach((brick) => {
+      if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y + 1 }))) {
+        player1Blocked = true;
+      }
+      game.player2Falling?.bricks.forEach((enemyBrick) => {
+        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y + 1
+        ) {
+          player1Blocked = true;
+        }
+      })
+    });
+    if (!player1Blocked) {
+      game.player1Falling?.bricks.forEach((brick) => {
+        brick.point.y = brick.point.y + 1;
+      })
+      if (game.player1Falling?.pivot) {
+        game.player1Falling.pivot.y = game.player1Falling?.pivot.y + 1;
+      }
+    }
+    if (player1Blocked) {
+      game.player1Falling?.bricks.forEach((brick) => {
+        game.bricks.push(brick);
+      });
+      game.player1Falling = player1RandomPiece();
+    }
+
+
+    var player2Blocked = false;
+    game.player2Falling?.bricks.forEach((brick) => {
+      if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y - 1 }))) {
+        player2Blocked = true;
+      }
+      game.player1Falling?.bricks.forEach((enemyBrick) => {
+        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
+        ) {
+          player2Blocked = true;
+        }
+      })
+    });
+    if (!player2Blocked) {
+      game.player2Falling?.bricks.forEach((brick) => {
+        brick.point.y = brick.point.y - 1;
+      })
+      if (game.player2Falling?.pivot) {
+        game.player2Falling.pivot.y = game.player2Falling?.pivot.y - 1;
+      }
+    }
+    if (player2Blocked) {
+      game.player2Falling?.bricks.forEach((brick) => {
+        game.bricks.push(brick);
+      });
+      game.player2Falling = player2RandomPiece();
+    }
+
+    // todo: check for clear
+    occupiedPoints.clear();
+    game.bricks.forEach(brick => {
+      occupiedPoints.add(key(brick.point));
+    })
+
+    for (let b = 9; b >= 0; b--) {
+      var rowClear = true;
+      for (let a = 0; a < 10; a++) {
+        if (!occupiedPoints.has(key({ x: a, y: b }))) {
+          rowClear = false;
+        }
+      }
+
+      if (rowClear) {
+        console.log(`${b} is clear`);
+
+        console.log(`bricks: ${game.bricks.length}`);
+        game.bricks = game.bricks.filter(brick => brick.point.y != b);
+        console.log(`bricks: ${game.bricks.length}`);
+
+        game.bricks.forEach(brick => {
+          console.log(`y: ${brick.point.y}`);
+          if (brick.point.y < b) {
+            brick.point.y += 1;
+            console.log(brick.point.y);
+            console.log(`new y: ${brick.point.y}`);
+          }
+        });
+        occupiedPoints.clear();
+        game.bricks.forEach(brick => {
+          occupiedPoints.add(key(brick.point));
+        })
+      }
+    }
+
+    occupiedPoints.clear();
+    game.bricks.forEach(brick => {
+      occupiedPoints.add(key(brick.point));
+    })
+
+    for (let b = 10; b < 20; b++) {
+      var rowClear = true;
+      for (let a = 0; a < 10; a++) {
+        if (!occupiedPoints.has(key({ x: a, y: b }))) {
+          rowClear = false;
+        }
+      }
+
+      if (rowClear) {
+        console.log(`${b} is clear`);
+
+        console.log(`bricks: ${game.bricks.length}`);
+        game.bricks = game.bricks.filter(brick => brick.point.y != b);
+        console.log(`bricks: ${game.bricks.length}`);
+
+        game.bricks.forEach(brick => {
+          console.log(`y: ${brick.point.y}`);
+          if (brick.point.y > b) {
+            brick.point.y -= 1;
+            console.log(brick.point.y);
+            console.log(`new y: ${brick.point.y}`);
+          }
+        });
+        occupiedPoints.clear();
+        game.bricks.forEach(brick => {
+          occupiedPoints.add(key(brick.point));
+        })
+      }
+    }
+
+
+
+    // todo: check for game over
+    var player1lost = false;
+
+    for (let a = 0; a < 10; a++) {
+      if (occupiedPoints.has(key({ x: a, y: 0 }))) {
+        player1lost = true;
+      }
+    }
+
+    var player2lost = false;
+
+    for (let a = 0; a < 10; a++) {
+      if (occupiedPoints.has(key({ x: a, y: 19 }))) {
+        player2lost = true;
+      }
+    }
+
+    if (player1lost && player2lost) {
+      game.winner = "tie"
+    }
+    else if (player1lost) {
+      game.winner = game.player2;
+    }
+    else if (player2lost) {
+      game.winner = game.player1;
+    }
+
+  }
+}
+
+function player1RandomPiece(): Tetronimo {
+  const r = Math.floor(Math.random() * 7);
+  if (r == 0) {
+    return player1line();
+  } else if (r == 1) {
+    return player1j();
+  } else if (r == 2) {
+    return player1L();
+  } else if (r == 3) {
+    return player1Square();
+  } else if (r == 4) {
+    return player1S();
+  } else if (r == 5) {
+    return player1Z();
+  }
+  return player1T();
+}
+
+function player1line(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() },
+      { point: { x: 3, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1.5, y: 0.5 }
+  };
+}
+
+function player1j(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 0, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1L(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: -1 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1Square(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 0, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 0.5, y: -0.5 }
+  };
+}
+
+function player1S(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 2, y: -1 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1Z(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: -1 }, id: uuidv4(), },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1T(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player2RandomPiece(): Tetronimo {
+  const r = Math.floor(Math.random() * 7);
+  if (r == 0) {
+    return player2line();
+  } else if (r == 1) {
+    return player2j();
+  } else if (r == 2) {
+    return player2L();
+  } else if (r == 3) {
+    return player2Square();
+  } else if (r == 4) {
+    return player2S();
+  } else if (r == 5) {
+    return player2Z();
+  }
+  return player2T();
+}
+
+function player2line(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() },
+      { point: { x: 3, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1.5, y: 19.5 }
+  };
+}
+
+function player2j(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 0, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2L(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 20 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2Square(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 0, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 0.5, y: 19.5 }
+  };
+}
+
+function player2S(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 2, y: 20 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2Z(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 20 }, id: uuidv4(), },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2T(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
 
 function broadcastStateUpdate(roomId: RoomId) {
   const game = rooms.get(roomId)!;
   const now = Date.now();
   // Map properties in the game's state which the clients need to know about to render the game
-  const state: GameState = {
-    players: game.players.map((player) => ({
-      id: player.id,
-      position: { x: player.body.x, y: player.body.y },
-      aimAngle: player.angle,
-    })),
-    bullets: game.bullets.map((bullet) => ({
-      id: bullet.id,
-      position: { x: bullet.body.x, y: bullet.body.y },
-    })),
-  };
 
   // Send the state update to each connected client
   const msg: ServerMessage = {
     type: ServerMessageType.StateUpdate,
-    state,
+    state: game,
     ts: now,
   };
   server.broadcastMessage(roomId, Buffer.from(JSON.stringify(msg), "utf8"));
 }
 
-function initializeRoom() {
-  const physics = new System();
-  const tileSize = map.tileSize;
-  const top = map.top * tileSize;
-  const left = map.left * tileSize;
-  const bottom = map.bottom * tileSize;
-  const right = map.right * tileSize;
 
-  // Create map wall bodies
-  map.walls.forEach(({ x, y, width, height }) => {
-    physics.insert(wallBody(x * tileSize, y * tileSize, width * tileSize, height * tileSize));
-  });
 
-  // Create map boundary boxes
-  physics.insert(wallBody(left, top - BOUNDARY_WIDTH, right - left, BOUNDARY_WIDTH)); // top
-  physics.insert(wallBody(left - BOUNDARY_WIDTH, top, BOUNDARY_WIDTH, bottom - top)); // left
-  physics.insert(wallBody(left, bottom, right - left, BOUNDARY_WIDTH)); // bottom
-  physics.insert(wallBody(right, top, BOUNDARY_WIDTH, bottom - top)); // right
 
-  return {
-    physics,
-    players: [],
-    bullets: [],
-  };
-}
-
-function wallBody(x: number, y: number, width: number, height: number): PhysicsBody {
-  return Object.assign(new Box({ x, y }, width, height, { isStatic: true }), {
-    oType: BodyType.Wall,
-  });
-}

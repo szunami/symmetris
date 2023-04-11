@@ -6,23 +6,31 @@ export enum Direction {
   Right,
 }
 
-export type Position = {
-  x: number;
-  y: number;
-};
-
 export type Player = {
   id: string;
-  position: Position;
-  aimAngle: number;
 };
 
-export type Bullet = {
-  id: number;
-  position: Position;
+export type Point = {
+  x: number,
+  y: number,
 };
+
+export type Brick = {
+  point: Point,
+  id: string
+  // todo: add color!
+}
+
+export type Tetronimo = {
+  bricks: Brick[];
+  // todo: pivot?
+}
 
 export type GameState = {
-  players: Player[];
-  bullets: Bullet[];
+  player1?: Player;
+  player2?: Player;
+  player1Falling?: Tetronimo;
+  player2Falling?: Tetronimo;
+
+  bricks: Brick[];
 };
