@@ -47,10 +47,7 @@ const store: Application = {
         game.player2 = { id: userId };
 
         game.player1Falling = player1RandomPiece();
-
-        // game.player2Falling = {
-        //   bricks: [{ point: { x: 0, y: 20 }, id: uuidv4() }]
-        // };
+        game.player2Falling = player2RandomPiece();
       }
     }
   },
@@ -90,7 +87,6 @@ const store: Application = {
       });
 
       if (userId === game.player1?.id) {
-        // Handle the various message types, specific to this game
         if (message.type === ClientMessageType.MoveRight) {
           // todo: check if blocked
           var rightBlocked = false;
@@ -168,6 +164,85 @@ const store: Application = {
         }
         server.sendMessage(roomId, userId, Buffer.from(JSON.stringify(msg), "utf8"));
       }
+
+      if (userId === game.player2?.id) {
+        if (message.type === ClientMessageType.MoveRight) {
+          // todo: check if blocked
+          var rightBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x + 1, y: brick.point.y }))
+              || brick.point.x + 1 == 10
+            ) {
+              rightBlocked = true;
+            }
+          });
+
+          if (!rightBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x + 1;
+            });
+            if (game.player2Falling?.pivot) {
+              game.player2Falling.pivot.x++;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.MoveLeft) {
+          // todo: check if blocked
+          var leftBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            if (occupiedPoints.has(key({ x: brick.point.x - 1, y: brick.point.y }))
+              || brick.point.x - 1 == -1) {
+              leftBlocked = true;
+            }
+          });
+
+          if (!leftBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              brick.point.x = brick.point.x - 1;
+            });
+            if (game.player2Falling?.pivot) {
+              game.player2Falling.pivot.x = game.player2Falling.pivot.x - 1;
+            }
+          }
+        }
+
+        if (message.type === ClientMessageType.Rotate) {
+          var rotateBlocked = false;
+
+          game.player2Falling?.bricks.forEach(brick => {
+            var pivot = game.player2Falling?.pivot!;
+            var offsetX = brick.point.x - pivot.x;
+            var offsetY = brick.point.y - pivot.y;
+            var newX = pivot.x - offsetY;
+            var newY = pivot.y + offsetX;
+            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            ) {
+              rotateBlocked = true;
+            }
+          });
+
+          if (!rotateBlocked) {
+            game.player2Falling?.bricks.forEach(brick => {
+              var pivot = game.player2Falling?.pivot!;
+              var offsetX = brick.point.x - pivot.x;
+              var offsetY = brick.point.y - pivot.y;
+              brick.point.x = pivot.x - offsetY;
+              brick.point.y = pivot.y + offsetX;
+            });
+          }
+        }
+
+        // todo: remove player2s update here!
+        const msg: ServerMessage = {
+          type: ServerMessageType.StateUpdate,
+          state: game,
+          ts: Date.now(),
+        }
+        server.sendMessage(roomId, userId, Buffer.from(JSON.stringify(msg), "utf8"));
+      }
     }
   },
 };
@@ -215,8 +290,7 @@ function tick(game: GameState, deltaMs: number) {
       }
       game.player2Falling?.bricks.forEach((enemyBrick) => {
         if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
-          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
-          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 2
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y + 1
         ) {
           player1Blocked = true;
         }
@@ -237,11 +311,34 @@ function tick(game: GameState, deltaMs: number) {
       game.player1Falling = player1RandomPiece();
     }
 
+
+    var player2Blocked = false;
     game.player2Falling?.bricks.forEach((brick) => {
-      if (!occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y - 1 }))) {
-        brick.point.y = brick.point.y - 1;
+      if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y - 1 }))) {
+        player2Blocked = true;
       }
+      game.player1Falling?.bricks.forEach((enemyBrick) => {
+        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
+        ) {
+          player2Blocked = true;
+        }
+      })
     });
+    if (!player2Blocked) {
+      game.player2Falling?.bricks.forEach((brick) => {
+        brick.point.y = brick.point.y - 1;
+      })
+      if (game.player2Falling?.pivot) {
+        game.player2Falling.pivot.y = game.player2Falling?.pivot.y - 1;
+      }
+    }
+    if (player2Blocked) {
+      game.player2Falling?.bricks.forEach((brick) => {
+        game.bricks.push(brick);
+      });
+      game.player2Falling = player2RandomPiece();
+    }
 
     // todo: check for clear
     occupiedPoints.clear();
@@ -386,6 +483,111 @@ function player1T(): Tetronimo {
     pivot: { x: 1, y: 0 }
   };
 }
+
+function player2RandomPiece(): Tetronimo {
+  const r = Math.floor(Math.random() * 7);
+  if (r == 0) {
+    return player2line();
+  } else if (r == 1) {
+    return player2j();
+  } else if (r == 2) {
+    return player2L();
+  } else if (r == 3) {
+    return player2Square();
+  } else if (r == 4) {
+    return player2S();
+  } else if (r == 5) {
+    return player2Z();
+  }
+  return player2T();
+}
+
+function player2line(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() },
+      { point: { x: 3, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1.5, y: 19.5 }
+  };
+}
+
+function player2j(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 0, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2L(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 20 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2Square(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 0, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 0.5, y: 19.5 }
+  };
+}
+
+function player2S(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 2, y: 20 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2Z(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 20 }, id: uuidv4(), },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
+function player2T(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 19 }, id: uuidv4(), },
+      { point: { x: 1, y: 19 }, id: uuidv4() },
+      { point: { x: 1, y: 20 }, id: uuidv4() },
+      { point: { x: 2, y: 19 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 19 }
+  };
+}
+
 
 function broadcastStateUpdate(roomId: RoomId) {
   const game = rooms.get(roomId)!;
