@@ -6,7 +6,7 @@ import { BootScene } from "./scenes/BootScene";
 
 new Game({
   type: AUTO,
-  width: 800,
+  width: 600,
   height: 600,
   scene: [BootScene, GameScene],
   parent: "root",
