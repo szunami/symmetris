@@ -346,7 +346,7 @@ function tick(game: GameState, deltaMs: number) {
       occupiedPoints.add(key(brick.point));
     })
 
-    for (let b = 10; b >= 0; b--) {
+    for (let b = 9; b >= 0; b--) {
       var rowClear = true;
       for (let a = 0; a < 10; a++) {
         if (!occupiedPoints.has(key({ x: a, y: b }))) {
@@ -365,6 +365,41 @@ function tick(game: GameState, deltaMs: number) {
           console.log(`y: ${brick.point.y}`);
           if (brick.point.y < b) {
             brick.point.y += 1;
+            console.log(brick.point.y);
+            console.log(`new y: ${brick.point.y}`);
+          }
+        });
+        occupiedPoints.clear();
+        game.bricks.forEach(brick => {
+          occupiedPoints.add(key(brick.point));
+        })
+      }
+    }
+
+    occupiedPoints.clear();
+    game.bricks.forEach(brick => {
+      occupiedPoints.add(key(brick.point));
+    })
+
+    for (let b = 10; b < 20; b++) {
+      var rowClear = true;
+      for (let a = 0; a < 10; a++) {
+        if (!occupiedPoints.has(key({ x: a, y: b }))) {
+          rowClear = false;
+        }
+      }
+
+      if (rowClear) {
+        console.log(`${b} is clear`);
+
+        console.log(`bricks: ${game.bricks.length}`);
+        game.bricks = game.bricks.filter(brick => brick.point.y != b);
+        console.log(`bricks: ${game.bricks.length}`);
+
+        game.bricks.forEach(brick => {
+          console.log(`y: ${brick.point.y}`);
+          if (brick.point.y > b) {
+            brick.point.y -= 1;
             console.log(brick.point.y);
             console.log(`new y: ${brick.point.y}`);
           }
