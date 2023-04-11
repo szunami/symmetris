@@ -16,6 +16,8 @@ export class GameScene extends Scene {
 
   private player2Text: Phaser.GameObjects.Text | undefined;
 
+  private winnerText: Phaser.GameObjects.Text | undefined;
+
   private existingBricks: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
   // A map of player sprites currently connected
@@ -96,6 +98,8 @@ export class GameScene extends Scene {
 
     const handleKeyEvt = () => {
       if (keys.W.isDown) {
+        this.connection.sendMessage({ type: ClientMessageType.Rotate });
+
       } else if (keys.S.isDown) {
       } else if (keys.D.isDown) {
         this.connection.sendMessage({ type: ClientMessageType.MoveRight });
@@ -109,6 +113,7 @@ export class GameScene extends Scene {
   }
 
   update() {
+
     // If the stateBuffer hasn't been defined, skip this update tick
     if (this.stateBuffer === undefined) {
       return;
@@ -116,18 +121,54 @@ export class GameScene extends Scene {
 
     const { state } = this.stateBuffer.getInterpolatedState(Date.now());
 
+    if (state.winner !== undefined && this.winnerText === undefined) {
+      const style = {backgroundColor: 'gray', depth: 10};
+      if (state.winner == "tie") {
+        this.winnerText = this.add.text(250, 300, `you both lost`, style);
+      } else if (state.winner.id == this.currentUserID) {
+        this.winnerText = this.add.text(250, 300, `they lost`, style);
+      } else {
+        this.winnerText = this.add.text(250, 300, `you lost`, style);
+      }
+      this.winnerText?.setDepth(10);
+    }
+
     if (state.player1 !== undefined && this.player1Text === undefined) {
-      this.player1Text = this.add.text(450, 0, `${state.player1.id}`, { color: "white" }).setScrollFactor(0);
+      if (state.player1.id === this.currentUserID) {
+        this.player1Text = this.add.text(450, 0, `you`, { color: "white" }).setScrollFactor(0);
+      } else {
+        this.player1Text = this.add.text(450, 0, `them`, { color: "white" }).setScrollFactor(0);
+      }
     }
 
     if (state.player2 !== undefined && this.player2Text === undefined) {
-      this.player2Text = this.add.text(450, 580, `${state.player2.id}`, { color: "white" }).setScrollFactor(0);
-    }
+      if (state.player2.id === this.currentUserID) {
+        this.player1Text = this.add.text(450, 580, `you`, { color: "white" }).setScrollFactor(0);
+      } else {
+        this.player1Text = this.add.text(450, 580, `them`, { color: "white" }).setScrollFactor(0);
+      }    }
 
     // todo: clear sprites from cleared bricks
     state.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
         this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass"));
+      } else {
+        const sprite = this.existingBricks.get(brick.id);
+        sprite?.setX(this.x(brick.point.x));
+        sprite?.setY(this.y(brick.point.y));
+      }
+    });
+
+    this.existingBricks.forEach((v, k) => {
+      var stillAround = false;
+      state.bricks.forEach(brick => {
+        if (brick.id === k) {
+          stillAround = true;
+        }
+      });
+      if (!stillAround) {
+        v.destroy();
+        this.existingBricks.delete(k);
       }
     });
 

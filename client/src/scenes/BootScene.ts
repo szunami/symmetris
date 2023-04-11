@@ -18,9 +18,6 @@ export class BootScene extends Scene {
   // Called immediately after the constructor, this function is used to preload assets
   preload() {
     // Load our assets from before
-    this.load.image("player", "player.png");
-    this.load.image("bullet", "bullet.png");
-    this.load.image("wall", "wall.png");
     this.load.image("grass", "grass.png");
   }
 

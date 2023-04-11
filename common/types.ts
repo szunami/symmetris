@@ -17,13 +17,13 @@ export type Point = {
 
 export type Brick = {
   point: Point,
-  id: string
+  id: string,
   // todo: add color!
 }
 
 export type Tetronimo = {
   bricks: Brick[];
-  // todo: pivot?
+  pivot: Point,
 }
 
 export type GameState = {
@@ -31,6 +31,8 @@ export type GameState = {
   player2?: Player;
   player1Falling?: Tetronimo;
   player2Falling?: Tetronimo;
+
+  winner?: Player | "tie";
 
   bricks: Brick[];
 };
