@@ -277,6 +277,10 @@ function key(point: Point): string {
 // The frame-by-frame logic of your game should live in it's server's tick function. This is often a place to check for collisions, compute score, and so forth
 function tick(game: GameState, deltaMs: number) {
 
+  if (game.winner) {
+    return;
+  }
+
   const occupiedPoints = new Set<string>();
   game.bricks.forEach(brick => {
     occupiedPoints.add(key(brick.point));
@@ -411,7 +415,35 @@ function tick(game: GameState, deltaMs: number) {
       }
     }
 
+
+
     // todo: check for game over
+    var player1lost = false;
+
+    for (let a = 0; a < 10; a++) {
+      if (occupiedPoints.has(key({ x: a, y: 0 }))) {
+        player1lost = true;
+      }
+    }
+
+    var player2lost = false;
+
+    for (let a = 0; a < 10; a++) {
+      if (occupiedPoints.has(key({ x: a, y: 19 }))) {
+        player2lost = true;
+      }
+    }
+
+    if (player1lost && player2lost) {
+      game.winner = "tie"
+    }
+    else if (player1lost) {
+      game.winner = game.player2;
+    }
+    else if (player2lost) {
+      game.winner = game.player1;
+    }
+
   }
 }
 
