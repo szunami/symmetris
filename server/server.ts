@@ -208,7 +208,6 @@ function tick(game: GameState, deltaMs: number) {
   })
 
   if (game.player1 !== undefined && game.player2 !== undefined) {
-
     var player1Blocked = false;
     game.player1Falling?.bricks.forEach((brick) => {
       if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y + 1 }))) {
@@ -227,7 +226,7 @@ function tick(game: GameState, deltaMs: number) {
       game.player1Falling?.bricks.forEach((brick) => {
         brick.point.y = brick.point.y + 1;
       })
-      if (game.player1Falling?.pivot.y) {
+      if (game.player1Falling?.pivot) {
         game.player1Falling.pivot.y = game.player1Falling?.pivot.y + 1;
       }
     }
@@ -285,10 +284,21 @@ function tick(game: GameState, deltaMs: number) {
 }
 
 function player1RandomPiece(): Tetronimo {
-  if (Math.floor(Math.random() * 2) == 0) {
+  const r = Math.floor(Math.random() * 7);
+  if (r == 0) {
     return player1line();
+  } else if (r == 1) {
+    return player1j();
+  } else if (r == 2) {
+    return player1L();
+  } else if (r == 3) {
+    return player1Square();
+  } else if (r == 4) {
+    return player1S();
+  } else if (r == 5) {
+    return player1Z();
   }
-  return player1j();
+  return player1T();
 }
 
 function player1line(): Tetronimo {
@@ -315,7 +325,67 @@ function player1j(): Tetronimo {
   };
 }
 
+function player1L(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: -1 }, id: uuidv4() }
 
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1Square(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 0, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() }
+
+    ],
+    pivot: { x: 0.5, y: -0.5 }
+  };
+}
+
+function player1S(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 2, y: -1 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1Z(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: -1 }, id: uuidv4(), },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
+
+function player1T(): Tetronimo {
+  return {
+    bricks: [
+      { point: { x: 0, y: 0 }, id: uuidv4(), },
+      { point: { x: 1, y: 0 }, id: uuidv4() },
+      { point: { x: 1, y: -1 }, id: uuidv4() },
+      { point: { x: 2, y: 0 }, id: uuidv4() }
+    ],
+    pivot: { x: 1, y: 0 }
+  };
+}
 
 function broadcastStateUpdate(roomId: RoomId) {
   const game = rooms.get(roomId)!;
