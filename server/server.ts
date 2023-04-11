@@ -28,11 +28,17 @@ const store: Application = {
     if (!rooms.has(roomId)) {
       console.log("newRoom", roomId, userId);
       // todo: interesting initial config
+      const initialBricks = [];
+
+      for (let a = 0; a < 10; a++) {
+        if (Math.random() > 0.5) {
+          initialBricks.push({ point: { x: a, y: 10 }, id: uuidv4() });
+          initialBricks.push({ point: { x: 9 - a, y: 11 }, id: uuidv4() });
+        }
+      }
+
       rooms.set(roomId, {
-        bricks: [
-          { point: { x: 0, y: 10 }, id: uuidv4() },
-          { point: { x: 5, y: 10 }, id: uuidv4() }
-        ],
+        bricks: initialBricks,
         player1: {
           id: userId
         },
