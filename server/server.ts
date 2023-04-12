@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { UserId, RoomId, Application, startServer, verifyJwt } from "@hathora/server-sdk";
 import dotenv from "dotenv";
-import { GameState, Point, Tetronimo } from "../common/types";
+import { Brick, GameState, Point, Tetronimo } from "../common/types";
 import { ClientMessage, ClientMessageType, ServerMessage, ServerMessageType } from "../common/messages";
 
 // The millisecond tick rate
@@ -304,7 +304,7 @@ function tick(game: GameState, deltaMs: number) {
       }
       game.player2Falling?.bricks.forEach((enemyBrick) => {
         if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
-          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y + 1
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
         ) {
           player1Blocked = true;
         }
@@ -318,7 +318,7 @@ function tick(game: GameState, deltaMs: number) {
       }
       game.player1Falling?.bricks.forEach((enemyBrick) => {
         if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
-          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y + 1
         ) {
           player2Blocked = true;
         }
@@ -708,7 +708,7 @@ function broadcastStateUpdate(roomId: RoomId) {
 
 
 function initialBricks() {
-  const result = [];
+  const result: Brick[] = [];
 
   for (let a = 0; a < 10; a++) {
     if (Math.random() > 0.5) {
