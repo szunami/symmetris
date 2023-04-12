@@ -14,3 +14,19 @@ jobs:
           hathora-cloud deploy --appId app-7ea79a10-9eb0-4676-8581-e6ac78032548
           --roomsPerProcess 10 --planName tiny --transportType tls
           --containerPort 4000 --env '[]' --token ${{ secrets.HATHORA_TOKEN }}
+  itch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: |
+        cd client
+        npm install
+        npm run build
+        cp dist/index.html dist/200.html
+    - uses: josephbmanley/butler-publish-itchio-action@master
+      env:
+        BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+        CHANNEL: webgl
+        ITCH_GAME: symmetris
+        ITCH_USER: szunami
+        PACKAGE: dist
