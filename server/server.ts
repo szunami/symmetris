@@ -310,6 +310,21 @@ function tick(game: GameState, deltaMs: number) {
         }
       })
     });
+
+    var player2Blocked = false;
+    game.player2Falling?.bricks.forEach((brick) => {
+      if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y - 1 }))) {
+        player2Blocked = true;
+      }
+      game.player1Falling?.bricks.forEach((enemyBrick) => {
+        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
+          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
+        ) {
+          player2Blocked = true;
+        }
+      })
+    });
+
     if (!player1Blocked) {
       game.player1Falling?.bricks.forEach((brick) => {
         brick.point.y = brick.point.y + 1;
@@ -325,20 +340,6 @@ function tick(game: GameState, deltaMs: number) {
       game.player1Falling = player1RandomPiece();
     }
 
-
-    var player2Blocked = false;
-    game.player2Falling?.bricks.forEach((brick) => {
-      if (occupiedPoints.has(key({ x: brick.point.x, y: brick.point.y - 1 }))) {
-        player2Blocked = true;
-      }
-      game.player1Falling?.bricks.forEach((enemyBrick) => {
-        if (brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y
-          || brick.point.x === enemyBrick.point.x && brick.point.y === enemyBrick.point.y - 1
-        ) {
-          player2Blocked = true;
-        }
-      })
-    });
     if (!player2Blocked) {
       game.player2Falling?.bricks.forEach((brick) => {
         brick.point.y = brick.point.y - 1;
