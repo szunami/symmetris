@@ -40,10 +40,6 @@ export class BootScene extends Scene {
 
 // The getToken function first checks sessionStorage to see if there is an existing token, and if there is returns it. If not, it logs the user into a new session and updates the sessionStorage key.
 async function getToken(): Promise<string> {
-  const maybeToken = sessionStorage.getItem("topdown-shooter-token");
-  if (maybeToken !== null) {
-    return maybeToken;
-  }
   const token = await client.loginAnonymous();
   sessionStorage.setItem("topdown-shooter-token", token);
   return token;
