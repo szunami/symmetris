@@ -6,23 +6,11 @@ Multiplayer 2D shooter demo made using [Hathora Buildkits](https://github.com/ha
 
 Assets from [Kenney](https://kenney.nl/assets/topdown-shooter)
 
-Read step-by-step [tutorial](https://docs.hathora.dev/#/buildkit/tutorial_top_down_shooter) for this implementation
-
-Additional implementations of the game client are also available for the following engines:
-  - [Unity](https://github.com/hathora/topdown-shooter-unity-client)
-  - [Bevy](https://github.com/hathora/topdown-shooter-bevy-client)
-
 ## Try it
 
-The game is playable at https://hathora-topdown-shooter.surge.sh
+The game is playable at https://visionary-sunshine-827244.netlify.app/
 
-![A screenshot of the completed top-down shooter game in action.](https://user-images.githubusercontent.com/5400947/199274234-ff3a66b4-3528-4be3-b6be-2240d3141846.png)
-
-Instructions:
-
-  - WASD to move
-  - Mouse to aim and shoot
-  - Once you are in a game, share the URL to allow others to join
+![A screenshot of symmetris.](screenshot.png)
 
 ## Running locally 
 
