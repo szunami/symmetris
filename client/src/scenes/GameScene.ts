@@ -12,10 +12,6 @@ export class GameScene extends Scene {
   // The buffer which holds state snapshots
   private stateBuffer: InterpolationBuffer<GameState> | undefined;
 
-  private player1Text: Phaser.GameObjects.Text | undefined;
-
-  private player2Text: Phaser.GameObjects.Text | undefined;
-
   private centerText: Phaser.GameObjects.Text | undefined;
 
   private existingBricks: Map<string, Phaser.GameObjects.Sprite> = new Map();
@@ -43,8 +39,11 @@ export class GameScene extends Scene {
     return 210 + a * 20;
   }
 
-  y(b: number): number {
-    return 110 + b * 20;
+  y(b: number, isPlayer2: boolean): number {
+    if (!isPlayer2) {
+      return 110 + b * 20;
+    }
+    return 600 - 110 - b * 20;
   }
 
   create() {
@@ -166,22 +165,6 @@ export class GameScene extends Scene {
     }
 
 
-    if (state.player1 !== undefined && this.player1Text === undefined) {
-      if (state.player1.id === this.currentUserID) {
-        this.player1Text = this.add.text(450, 0, `you`, { color: "white" }).setScrollFactor(0);
-      } else {
-        this.player1Text = this.add.text(450, 0, `them`, { color: "white" }).setScrollFactor(0);
-      }
-    }
-
-    if (state.player2 !== undefined && this.player2Text === undefined) {
-      if (state.player2.id === this.currentUserID) {
-        this.player1Text = this.add.text(450, 580, `you`, { color: "white" }).setScrollFactor(0);
-      } else {
-        this.player1Text = this.add.text(450, 580, `them`, { color: "white" }).setScrollFactor(0);
-      }
-    }
-
     if (state.player1?.ready && state.player2?.ready) {
       this.centerText?.setText("");
     }
@@ -189,11 +172,11 @@ export class GameScene extends Scene {
     // todo: clear sprites from cleared bricks
     state.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass").setTint(0x888888));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass").setTint(0x888888));
       } else {
         const sprite = this.existingBricks.get(brick.id);
         sprite?.setX(this.x(brick.point.x));
-        sprite?.setY(this.y(brick.point.y));
+        sprite?.setY(this.y(brick.point.y, youArePlayer2));
         sprite?.setTint(0x888888);
       }
     });
@@ -213,21 +196,21 @@ export class GameScene extends Scene {
 
     state.player1Falling?.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass"));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass"));
       } else {
         const existingBrick = this.existingBricks.get(brick.id);
         existingBrick?.setX(this.x(brick.point.x));
-        existingBrick?.setY(this.y(brick.point.y));
+        existingBrick?.setY(this.y(brick.point.y, youArePlayer2));
       }
     });
 
     state.player2Falling?.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass"));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass"));
       } else {
         const existingBrick = this.existingBricks.get(brick.id);
         existingBrick?.setX(this.x(brick.point.x));
-        existingBrick?.setY(this.y(brick.point.y));
+        existingBrick?.setY(this.y(brick.point.y, youArePlayer2));
       }
     });
   }
