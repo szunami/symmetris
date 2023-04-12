@@ -27,8 +27,6 @@ const store: Application = {
   subscribeUser(roomId: RoomId, userId: string): void {
     if (!rooms.has(roomId)) {
       console.log("newRoom", roomId, userId);
-      // todo: interesting initial config
-
 
       rooms.set(roomId, {
         bricks: [],
@@ -86,7 +84,6 @@ const store: Application = {
         if (message.type === ClientMessageType.Ready) {
           game.player1.ready = true;
         } else if (message.type === ClientMessageType.MoveRight) {
-          // todo: check if blocked
           var rightBlocked = false;
 
           game.player1Falling?.bricks.forEach(brick => {
@@ -108,7 +105,6 @@ const store: Application = {
         }
 
         if (message.type === ClientMessageType.MoveLeft) {
-          // todo: check if blocked
           var leftBlocked = false;
 
           game.player1Falling?.bricks.forEach(brick => {
@@ -137,7 +133,8 @@ const store: Application = {
             var offsetY = brick.point.y - pivot.y;
             var newX = pivot.x - offsetY;
             var newY = pivot.y + offsetX;
-            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            if (occupiedPoints.has(key({ x: newX, y: newY })) ||
+              newX < 0 || newX >= 10
             ) {
               rotateBlocked = true;
             }
@@ -218,7 +215,8 @@ const store: Application = {
             var offsetY = brick.point.y - pivot.y;
             var newX = pivot.x - offsetY;
             var newY = pivot.y + offsetX;
-            if (occupiedPoints.has(key({ x: newX, y: newY }))
+            if (occupiedPoints.has(key({ x: newX, y: newY })) ||
+              newX < 0 || newX >= 10
             ) {
               rotateBlocked = true;
             }

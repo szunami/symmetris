@@ -47,6 +47,7 @@ export class GameScene extends Scene {
   }
 
   create() {
+
     const tileSize = 20;
     const top = 0;
     const left = 0;
@@ -59,6 +60,12 @@ export class GameScene extends Scene {
 
     // Set the main camera's background colour and bounding box
     this.cameras.main.setBounds(left, top, right - left, bottom - top);
+    this.cameras.main.setBackgroundColor("#172038");
+
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0x819796);
+    graphics.fillRect(200, 0, 200, 600)
+
 
     // Ping indicator
     const pingText = this.add.text(0, 0, "Ping:", { color: "white" }).setScrollFactor(0);
