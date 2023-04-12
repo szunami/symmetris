@@ -28,19 +28,13 @@ const store: Application = {
     if (!rooms.has(roomId)) {
       console.log("newRoom", roomId, userId);
       // todo: interesting initial config
-      const initialBricks = [];
 
-      for (let a = 0; a < 10; a++) {
-        if (Math.random() > 0.5) {
-          initialBricks.push({ point: { x: a, y: 10 }, id: uuidv4() });
-          initialBricks.push({ point: { x: 9 - a, y: 11 }, id: uuidv4() });
-        }
-      }
 
       rooms.set(roomId, {
-        bricks: initialBricks,
+        bricks: [],
         player1: {
-          id: userId
+          id: userId,
+          ready: false
         },
       });
     }
@@ -49,10 +43,7 @@ const store: Application = {
 
     if (game.player2 === undefined) {
       if (game.player1?.id !== userId) {
-        game.player2 = { id: userId };
-
-        game.player1Falling = player1RandomPiece();
-        game.player2Falling = player2RandomPiece();
+        game.player2 = { id: userId, ready: false };
       }
     }
   },
@@ -92,7 +83,9 @@ const store: Application = {
       });
 
       if (userId === game.player1?.id) {
-        if (message.type === ClientMessageType.MoveRight) {
+        if (message.type === ClientMessageType.Ready) {
+          game.player1.ready = true;
+        } else if (message.type === ClientMessageType.MoveRight) {
           // todo: check if blocked
           var rightBlocked = false;
 
@@ -171,7 +164,9 @@ const store: Application = {
       }
 
       if (userId === game.player2?.id) {
-        if (message.type === ClientMessageType.MoveRight) {
+        if (message.type === ClientMessageType.Ready) {
+          game.player2.ready = true;
+        } else if (message.type === ClientMessageType.MoveRight) {
           // todo: check if blocked
           var rightBlocked = false;
 
@@ -282,8 +277,18 @@ function key(point: Point): string {
 // The frame-by-frame logic of your game should live in it's server's tick function. This is often a place to check for collisions, compute score, and so forth
 function tick(game: GameState, deltaMs: number) {
 
-  if (game.winner) {
+  if (game.winner && !(game.player1?.ready && game.player2?.ready)) {
     return;
+  }
+
+  if (game.player1?.ready
+    && game.player2?.ready
+    && game.player1Falling == undefined
+    && game.player2Falling == undefined) {
+    game.winner = undefined;
+    game.bricks = initialBricks();
+    game.player1Falling = player1RandomPiece();
+    game.player2Falling = player2RandomPiece();
   }
 
   const occupiedPoints = new Set<string>();
@@ -452,12 +457,24 @@ function tick(game: GameState, deltaMs: number) {
 
     if (player1lost && player2lost) {
       game.winner = "tie"
+      game.player1.ready = false;
+      game.player2.ready = false;
+      game.player1Falling = undefined;
+      game.player2Falling = undefined;
     }
     else if (player1lost) {
       game.winner = game.player2;
+      game.player1.ready = false;
+      game.player2.ready = false;
+      game.player1Falling = undefined;
+      game.player2Falling = undefined;
     }
     else if (player2lost) {
       game.winner = game.player1;
+      game.player1.ready = false;
+      game.player2.ready = false;
+      game.player1Falling = undefined;
+      game.player2Falling = undefined;
     }
   }
 }
@@ -688,3 +705,15 @@ function broadcastStateUpdate(roomId: RoomId) {
 
 
 
+
+function initialBricks() {
+  const result = [];
+
+  for (let a = 0; a < 10; a++) {
+    if (Math.random() > 0.5) {
+      result.push({ point: { x: a, y: 10 }, id: uuidv4() });
+      result.push({ point: { x: 9 - a, y: 11 }, id: uuidv4() });
+    }
+  }
+  return result;
+}
