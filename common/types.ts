@@ -8,6 +8,7 @@ export enum Direction {
 
 export type Player = {
   id: string;
+  ready: boolean;
 };
 
 export type Point = {

@@ -1,6 +1,7 @@
 import { Direction, GameState } from "./types";
 
 export enum ClientMessageType {
+  Ready,
   MoveRight,
   MoveLeft,
   Rotate,
@@ -12,7 +13,11 @@ export enum ServerMessageType {
   PingResponse,
 }
 
-export type ClientMessage = MoveRightMessage | MoveLeftMessage | RotateMessage | PingMessage;
+export type ClientMessage = ReadyMessage | MoveRightMessage | MoveLeftMessage | RotateMessage | PingMessage;
+
+export type ReadyMessage = {
+  type: ClientMessageType.Ready;
+}
 
 export type MoveRightMessage = {
   type: ClientMessageType.MoveRight;

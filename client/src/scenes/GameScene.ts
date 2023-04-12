@@ -16,7 +16,7 @@ export class GameScene extends Scene {
 
   private player2Text: Phaser.GameObjects.Text | undefined;
 
-  private winnerText: Phaser.GameObjects.Text | undefined;
+  private centerText: Phaser.GameObjects.Text | undefined;
 
   private existingBricks: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
@@ -35,6 +35,8 @@ export class GameScene extends Scene {
 
     const currentUser = HathoraClient.getUserFromToken(token);
     this.currentUserID = currentUser.id;
+
+    this.centerText = this.add.text(250, 300, "").setDepth(10);
   }
 
   x(a: number): number {
@@ -89,21 +91,27 @@ export class GameScene extends Scene {
     }, 1000);
 
     // Handle keyboard input
-    const keys = this.input.keyboard.addKeys("W,S,A,D") as {
+    const keys = this.input.keyboard.addKeys("SPACE,W,S,A,D,UP,LEFT,RIGHT,DOWN") as {
+      SPACE: Phaser.Input.Keyboard.Key;
       W: Phaser.Input.Keyboard.Key;
       S: Phaser.Input.Keyboard.Key;
       A: Phaser.Input.Keyboard.Key;
       D: Phaser.Input.Keyboard.Key;
+      UP: Phaser.Input.Keyboard.Key;
+      LEFT: Phaser.Input.Keyboard.Key;
+      RIGHT: Phaser.Input.Keyboard.Key;
+      DOWN: Phaser.Input.Keyboard.Key;
     };
 
     const handleKeyEvt = () => {
-      if (keys.W.isDown) {
+      if (keys.SPACE.isDown) {
+        this.connection.sendMessage({ type: ClientMessageType.Ready });
+      } else if (keys.W.isDown || keys.UP.isDown) {
         this.connection.sendMessage({ type: ClientMessageType.Rotate });
-
-      } else if (keys.S.isDown) {
-      } else if (keys.D.isDown) {
+      } else if (keys.S.isDown || keys.DOWN.isDown) {
+      } else if (keys.D.isDown || keys.RIGHT.isDown) {
         this.connection.sendMessage({ type: ClientMessageType.MoveRight });
-      } else if (keys.A.isDown) {
+      } else if (keys.A.isDown || keys.LEFT.isDown) {
         this.connection.sendMessage({ type: ClientMessageType.MoveLeft });
       } else {
       }
@@ -121,17 +129,42 @@ export class GameScene extends Scene {
 
     const { state } = this.stateBuffer.getInterpolatedState(Date.now());
 
-    if (state.winner !== undefined && this.winnerText === undefined) {
-      const style = {backgroundColor: 'gray', depth: 10};
+    console.log(state);
+
+    const youArePlayer1 = this.currentUserID == state.player1?.id;
+    const youArePlayer2 = this.currentUserID == state.player2?.id;
+    const youAreReady = (youArePlayer1 && state.player1?.ready) || (youArePlayer2 && state.player2?.ready);
+    const theyAreReady = (youArePlayer1 && state.player2?.ready) || (youArePlayer2 && state.player1?.ready);
+
+    if (state.player1 !== undefined && state.player2 === undefined) {
+      this.centerText?.setText(`waiting for them to join`);
+    } else if (state.winner !== undefined) {
       if (state.winner == "tie") {
-        this.winnerText = this.add.text(250, 300, `you both lost`, style);
+        if (youAreReady && !theyAreReady) {
+          this.centerText?.setText(`you both lost\nwaiting on them`);
+        } else {
+          this.centerText?.setText(`you both lost\nplace space when you're ready`);
+        }
       } else if (state.winner.id == this.currentUserID) {
-        this.winnerText = this.add.text(250, 300, `they lost`, style);
+        if (youAreReady && !theyAreReady) {
+          this.centerText?.setText(`they lost\nwaiting on them`);
+        } else {
+          this.centerText?.setText(`they lost\npress space when you're ready`);
+        }
       } else {
-        this.winnerText = this.add.text(250, 300, `you lost`, style);
+        if (youAreReady && !theyAreReady) {
+          this.centerText?.setText(`you lost\nwaiting on them`);
+        } else {
+          this.centerText?.setText(`you lost\npress space when you're ready`);
+        }
       }
-      this.winnerText?.setDepth(10);
     }
+    else if (youAreReady && !theyAreReady) {
+      this.centerText?.setText(`waiting for them`);
+    } else if (!youAreReady) {
+      this.centerText?.setText(`press space when you're ready`);
+    }
+
 
     if (state.player1 !== undefined && this.player1Text === undefined) {
       if (state.player1.id === this.currentUserID) {
@@ -146,16 +179,22 @@ export class GameScene extends Scene {
         this.player1Text = this.add.text(450, 580, `you`, { color: "white" }).setScrollFactor(0);
       } else {
         this.player1Text = this.add.text(450, 580, `them`, { color: "white" }).setScrollFactor(0);
-      }    }
+      }
+    }
+
+    if (state.player1?.ready && state.player2?.ready) {
+      this.centerText?.setText("");
+    }
 
     // todo: clear sprites from cleared bricks
     state.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass"));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y), "grass").setTint(0x888888));
       } else {
         const sprite = this.existingBricks.get(brick.id);
         sprite?.setX(this.x(brick.point.x));
         sprite?.setY(this.y(brick.point.y));
+        sprite?.setTint(0x888888);
       }
     });
 
