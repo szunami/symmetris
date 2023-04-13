@@ -47,20 +47,11 @@ async function getToken(): Promise<string> {
 
 // getRoomId will first check if the location's pathname contains the roomId, and will return it if it does, otherwise it will request one from the HathoraClient instance we defined earlier.
 async function getRoomId(token: string): Promise<string> {
-
-  if (top) {
-    if (top.location.pathname.split("/").length > 2) {
-      return location.pathname.split("/").pop()!;
-    } else {
-      const roomId = await client.createPrivateLobby(token);
-      top.history.pushState({}, "", `/${roomId}`);
-    }
-  }
-  if (location.pathname.split("/").length > 1) {
+  if (location.pathname.length > 1) {
     return location.pathname.split("/").pop()!;
   } else {
     const roomId = await client.createPrivateLobby(token);
-    window.history.pushState({}, "", `/${roomId}`);
+    history.pushState({}, "", `/${roomId}`);
     return roomId;
   }
 }
