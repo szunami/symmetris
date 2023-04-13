@@ -24,7 +24,7 @@ jobs:
         npm run build
         cp dist/index.html dist/200.html
       env:
-        APP_ID: ${{ env.APP_ID }}
+        APP_ID: ${{ vars.APP_ID }}
     - uses: josephbmanley/butler-publish-itchio-action@master
       env:
         BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
