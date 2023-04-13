@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
     publicDir: "src/assets",
     server: { host: "0.0.0.0" },
     clearScreen: false,
+    envDir: "../",
+    envPrefix: "APP_ID",
     define: {
       "process.env": {
         APP_ID: process.env.APP_ID ?? env.APP_ID,
