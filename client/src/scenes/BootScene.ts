@@ -21,15 +21,19 @@ export class BootScene extends Scene {
   preload() {
     // Load our assets from before
     this.load.image("grass", "grass.png");
+    this.load.image("logo", "logo.svg");
   }
 
   // Called before the update loop begins, create is used to intialize what the scene needs
   create() {
     const { width, height } = this.scale;
+
+    this.add.sprite(300, 100, "logo").setScale(0.1, 0.1);
+
     // Make a call to our getToken function, defined below
     getToken().then(async (token) => {
       const createButton = this.add
-        .text(width / 2, height / 4, "Create New Game", {
+        .text(width / 2, height / 2, "Create New Game", {
           fontSize: "20px",
           fontFamily: "futura",
         })
