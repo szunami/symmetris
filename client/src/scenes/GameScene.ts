@@ -78,7 +78,7 @@ export class GameScene extends Scene {
       fontSize: "16px",
     };
     const inputText = new InputText(this, 500, 15, 190, 30, inputTextConfig);
-    this.add.existing(inputText);    
+    this.add.existing(inputText);
     const pings: number[] = [];
 
     this.connection.addListener((msg) => {
@@ -194,7 +194,7 @@ export class GameScene extends Scene {
         const sprite = this.existingBricks.get(brick.id);
         sprite?.setX(this.x(brick.point.x));
         sprite?.setY(this.y(brick.point.y, youArePlayer2));
-        sprite?.setTint(0x888888);
+        sprite?.setTint(0x577277);
       }
     });
 
@@ -213,7 +213,7 @@ export class GameScene extends Scene {
 
     state.player1Falling?.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass"));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass").setTint(0xebede9));
       } else {
         const existingBrick = this.existingBricks.get(brick.id);
         existingBrick?.setX(this.x(brick.point.x));
@@ -223,7 +223,7 @@ export class GameScene extends Scene {
 
     state.player2Falling?.bricks.forEach((brick) => {
       if (!this.existingBricks.has(brick.id)) {
-        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass"));
+        this.existingBricks.set(brick.id, this.add.sprite(this.x(brick.point.x), this.y(brick.point.y, youArePlayer2), "grass").setTint(0xebede9));
       } else {
         const existingBrick = this.existingBricks.get(brick.id);
         existingBrick?.setX(this.x(brick.point.x));
