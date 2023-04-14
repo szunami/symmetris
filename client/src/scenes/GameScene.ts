@@ -4,6 +4,7 @@ import { InterpolationBuffer } from "interpolation-buffer";
 import { ClientMessageType, ServerMessageType } from "../../../common/messages";
 import { Brick, Direction, GameState, Player } from "../../../common/types";
 import { RoomConnection } from "../connection";
+import InputText from "phaser3-rex-plugins/plugins/inputtext";
 
 export class GameScene extends Scene {
   // A variable to represent our RoomConnection instance
@@ -54,10 +55,6 @@ export class GameScene extends Scene {
     const bottom = 20 * tileSize;
     const right = 10 * 64;
 
-    // Render grass
-    // this.add.sprite(this.x(0), this.y(0), "grass");
-    // this.add.sprite(this.x(1), this.y(1), "grass");
-
     // Set the main camera's background colour and bounding box
     this.cameras.main.setBounds(left, top, right - left, bottom - top);
     this.cameras.main.setBackgroundColor("#172038");
@@ -69,6 +66,19 @@ export class GameScene extends Scene {
 
     // Ping indicator
     const pingText = this.add.text(0, 0, "Ping:", { color: "white" }).setScrollFactor(0);
+    const inputTextConfig: InputText.IConfig = {
+      readOnly: true,
+      text: `Room ID: ${this.connection.roomId}`,
+      border: 10,
+      borderColor: "black",
+      backgroundColor: "white",
+      placeholder: "Room Code",
+      color: "black",
+      fontFamily: "futura",
+      fontSize: "16px",
+    };
+    const inputText = new InputText(this, 500, 15, 190, 30, inputTextConfig);
+    this.add.existing(inputText);    
     const pings: number[] = [];
 
     this.connection.addListener((msg) => {

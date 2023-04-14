@@ -10,4 +10,5 @@ new Game({
   height: 600,
   scene: [BootScene, GameScene],
   parent: "root",
+  dom: { createContainer: true },
 });
