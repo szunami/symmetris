@@ -33,7 +33,7 @@ export class BootScene extends Scene {
 
     const { width, height } = this.scale;
 
-    this.logoSprite = this.add.sprite(300, 200, "logo").setScale(0.1, 0.1).setTint(0xebede9);
+    this.logoSprite = this.add.sprite(300, 200, "logo").setScale(0.1, 0.1);
 
     // Make a call to our getToken function, defined below
     getToken().then(async (token) => {
